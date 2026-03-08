@@ -1,0 +1,35 @@
+# PowerSync Sync Streams configuration
+# Deploy to PowerSync dashboard after connecting to Supabase
+config:
+  edition: 3
+
+streams:
+  # Auto-subscribed: host's properties load on connect
+  my_properties:
+    auto_subscribe: true
+    query: SELECT * FROM properties WHERE host_id = auth.user_id()
+
+  # Parameterized: bookings for a specific property
+  property_bookings:
+    query: SELECT * FROM bookings WHERE property_id = subscription.parameter('property_id')
+
+  # Parameterized: messages for a specific booking
+  booking_messages:
+    query: SELECT * FROM messages WHERE booking_id = subscription.parameter('booking_id')
+
+  # Parameterized: tasks for a specific property
+  property_tasks:
+    query: SELECT * FROM tasks WHERE property_id = subscription.parameter('property_id')
+
+  # Parameterized: pricing history for a specific property
+  property_pricing:
+    query: SELECT * FROM pricing_history WHERE property_id = subscription.parameter('property_id')
+
+  # Auto-subscribed: all agent memories for host's properties
+  guest_memories:
+    auto_subscribe: true
+    query: >
+      SELECT * FROM agent_memories
+      WHERE property_id IN (
+        SELECT id FROM properties WHERE host_id = auth.user_id()
+      )

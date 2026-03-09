@@ -2,6 +2,14 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, usePowerSync } from "@powersync/react";
 import { MessageBubble } from "@/components/MessageBubble";
+import { formatDate, formatCurrency, nightCount } from "@/lib/format";
+
+const STATUSES = [
+  { value: "confirmed", label: "Confirmed" },
+  { value: "checked_in", label: "Checked In" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 export function BookingDetail() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +41,13 @@ export function BookingDetail() {
     setNewMessage("");
   };
 
+  const updateStatus = async (status: string) => {
+    await db.execute(
+      "UPDATE bookings SET status = ? WHERE id = ?",
+      [status, id!],
+    );
+  };
+
   if (!booking) {
     return <p className="text-gray-500">Booking not found.</p>;
   }
@@ -51,9 +66,52 @@ export function BookingDetail() {
           {booking.guest_name}
         </h1>
         <p className="text-sm text-gray-500">
-          {booking.check_in} &rarr; {booking.check_out} &middot;{" "}
-          <span className="capitalize">{booking.status}</span>
+          {formatDate(booking.check_in)} &rarr; {formatDate(booking.check_out)}
+          {booking.check_in && booking.check_out && (
+            <span className="text-gray-400 ml-1">
+              ({nightCount(booking.check_in, booking.check_out)} nights)
+            </span>
+          )}
         </p>
+      </div>
+
+      {/* Guest info + status */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            {booking.guest_email && (
+              <p className="text-sm text-gray-600">{booking.guest_email}</p>
+            )}
+            {booking.guest_phone && (
+              <p className="text-sm text-gray-600">{booking.guest_phone}</p>
+            )}
+            {booking.total_price && (
+              <p className="text-sm font-medium text-gray-900">
+                {formatCurrency(booking.total_price)}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-1.5 flex-wrap justify-end">
+            {STATUSES.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => updateStatus(s.value)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                  booking.status === s.value
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {booking.notes && (
+          <p className="text-sm text-gray-500 border-t border-gray-100 pt-2">
+            {booking.notes}
+          </p>
+        )}
       </div>
 
       {/* Messages */}

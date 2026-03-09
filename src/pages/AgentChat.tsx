@@ -1,21 +1,42 @@
 import { useState } from "react";
+import { useQuery } from "@powersync/react";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-const MASTRA_URL = "http://localhost:4111";
+const MASTRA_URL = import.meta.env.VITE_MASTRA_URL || "http://localhost:4111";
+
+const STARTER_PROMPTS = [
+  "What should I price my place for this weekend?",
+  "Any repeat guests with upcoming bookings?",
+  "Is my unit available March 20-25?",
+  "Draft a welcome message for my next guest",
+];
 
 export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState("");
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const { data: properties } = useQuery("SELECT id, name FROM properties ORDER BY name");
 
-    const userMessage: ChatMessage = { role: "user", content: input.trim() };
+  const sendMessage = async (text?: string) => {
+    const content = (text ?? input).trim();
+    if (!content || loading) return;
+
+    // Prepend property context if selected
+    let contextPrefix = "";
+    if (selectedProperty) {
+      const prop = properties.find((p) => p.id === selectedProperty);
+      if (prop) {
+        contextPrefix = `[Property: ${prop.name} (ID: ${selectedProperty})]\n\n`;
+      }
+    }
+
+    const userMessage: ChatMessage = { role: "user", content };
     const allMessages = [...messages, userMessage];
     setMessages(allMessages);
     setInput("");
@@ -26,9 +47,11 @@ export function AgentChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: allMessages.map((m) => ({
+          messages: allMessages.map((m, i) => ({
             role: m.role,
-            content: m.content,
+            content: i === allMessages.length - 1 && m.role === "user"
+              ? contextPrefix + m.content
+              : m.content,
           })),
         }),
       });
@@ -47,7 +70,7 @@ export function AgentChat() {
         {
           role: "assistant",
           content:
-            "Could not reach the AI agent. Make sure `npx mastra dev` is running on port 4111.",
+            "Could not reach the AI agent. Make sure `npx mastra dev` is running.",
         },
       ]);
     } finally {
@@ -57,21 +80,48 @@ export function AgentChat() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Jamii AI Agent</h1>
-        <p className="text-sm text-gray-500">
-          Ask about pricing, guest history, availability, or draft a guest response.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Jamii AI Agent</h1>
+          <p className="text-sm text-gray-500">
+            Ask about pricing, guest history, availability, or draft a guest response.
+          </p>
+        </div>
+        {properties.length > 0 && (
+          <select
+            value={selectedProperty}
+            onChange={(e) => setSelectedProperty(e.target.value)}
+            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All properties</option>
+            {properties.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Chat area */}
       <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 min-h-[400px] max-h-[600px] overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-400 mt-32 space-y-2">
-            <p className="text-2xl">Jamii</p>
-            <p className="text-sm">
-              Try: "What should I price my unit for this weekend?"
-            </p>
+          <div className="flex flex-col items-center justify-center h-80 space-y-6">
+            <div className="text-center space-y-2">
+              <p className="text-2xl text-gray-400">Jamii</p>
+              <p className="text-sm text-gray-400">
+                Your AI host assistant — pricing, guests, and availability
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 max-w-md">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => sendMessage(prompt)}
+                  className="text-left text-sm text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           messages.map((m, i) => (
@@ -112,7 +162,7 @@ export function AgentChat() {
           disabled={loading}
         />
         <button
-          onClick={sendMessage}
+          onClick={() => sendMessage()}
           disabled={loading}
           className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
         >

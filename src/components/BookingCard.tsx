@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { BookingRecord } from "@/lib/powersync/schema";
+import { formatDate, formatCurrency, nightCount } from "@/lib/format";
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: "bg-blue-100 text-blue-800",
@@ -8,8 +9,19 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: "Confirmed",
+  checked_in: "Checked In",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
 export function BookingCard({ booking }: { booking: BookingRecord & { id: string } }) {
   const statusClass = (booking.status ? STATUS_COLORS[booking.status] : null) ?? "bg-gray-100 text-gray-800";
+  const statusLabel = (booking.status ? STATUS_LABELS[booking.status] : null) ?? booking.status;
+  const nights = booking.check_in && booking.check_out
+    ? nightCount(booking.check_in, booking.check_out)
+    : null;
 
   return (
     <Link
@@ -20,16 +32,21 @@ export function BookingCard({ booking }: { booking: BookingRecord & { id: string
         <div>
           <h3 className="font-medium text-gray-900">{booking.guest_name}</h3>
           <p className="text-sm text-gray-500 mt-1">
-            {booking.check_in} &rarr; {booking.check_out}
+            {formatDate(booking.check_in)} &rarr; {formatDate(booking.check_out)}
+            {nights && (
+              <span className="text-gray-400 ml-1">
+                ({nights} {nights === 1 ? "night" : "nights"})
+              </span>
+            )}
           </p>
         </div>
         <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusClass}`}>
-          {booking.status}
+          {statusLabel}
         </span>
       </div>
       {booking.total_price && (
         <p className="text-sm text-gray-600 mt-2">
-          KES {Number(booking.total_price).toLocaleString()}
+          {formatCurrency(booking.total_price)}
         </p>
       )}
     </Link>

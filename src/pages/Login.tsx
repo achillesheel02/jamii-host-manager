@@ -28,6 +28,21 @@ export function Login() {
     navigate("/");
   };
 
+  const handleDemo = async () => {
+    setLoading(true);
+    setError("");
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: "host@jamii.app",
+      password: "jamii-demo-2026",
+    });
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-sm w-full">
@@ -69,9 +84,7 @@ export function Login() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button
             type="submit"
@@ -91,6 +104,14 @@ export function Login() {
               : "Need an account? Sign up"}
           </button>
         </form>
+
+        <button
+          onClick={handleDemo}
+          disabled={loading}
+          className="w-full mt-4 border border-gray-300 bg-white text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+        >
+          Try Demo Account
+        </button>
       </div>
     </div>
   );

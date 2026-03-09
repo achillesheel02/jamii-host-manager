@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { SyncStatus } from "./SyncStatus";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 const NAV_ITEMS = [
   { path: "/", label: "Dashboard" },
@@ -8,6 +9,7 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -17,7 +19,7 @@ export function Layout() {
           <Link to="/" className="text-xl font-bold text-blue-600">
             Jamii
           </Link>
-          <nav className="flex gap-4">
+          <nav className="flex gap-1">
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.path}
@@ -33,7 +35,18 @@ export function Layout() {
             ))}
           </nav>
         </div>
-        <SyncStatus />
+        <div className="flex items-center gap-4">
+          <SyncStatus />
+          <span className="text-xs text-gray-400 hidden sm:inline">
+            {user?.email}
+          </span>
+          <button
+            onClick={signOut}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       {/* Main content */}

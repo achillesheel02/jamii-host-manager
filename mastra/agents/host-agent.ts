@@ -1,9 +1,22 @@
 import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
-import { anthropic } from "@ai-sdk/anthropic";
+import { LibSQLStore } from "@mastra/libsql";
+import { createAnthropic } from "@ai-sdk/anthropic";
+
+const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 import { checkPricingTool } from "../tools/pricing-tool";
 import { fetchGuestHistoryTool } from "../tools/guest-history-tool";
 import { checkAvailabilityTool } from "../tools/calendar-tool";
+import { createTaskTool } from "../tools/create-task-tool";
+import { updatePricingTool } from "../tools/update-pricing-tool";
+import { draftMessageTool } from "../tools/draft-message-tool";
+
+const storage = new LibSQLStore({
+  id: "jamii-memory",
+  url: "file:./jamii-memory.db",
+});
 
 export const hostAgent = new Agent({
   id: "jamii-host-agent",
@@ -16,6 +29,9 @@ CAPABILITIES:
 - Recognize returning guests and personalize responses from their history
 - Check property availability for requested dates
 - Handle check-in/check-out queries, amenity questions, and special requests
+- CREATE tasks (cleaning, turnover, maintenance) for properties
+- RECORD pricing suggestions that the host can see in their pricing history
+- DRAFT guest messages for the host to review before sending
 
 BEHAVIORAL GUIDELINES:
 - Be warm, concise, and helpful — reflect Kenyan hospitality
@@ -34,8 +50,12 @@ excellent restaurants, proximity to Westlands CBD, and a safe, leafy environment
     checkPricingTool,
     fetchGuestHistoryTool,
     checkAvailabilityTool,
+    createTaskTool,
+    updatePricingTool,
+    draftMessageTool,
   },
   memory: new Memory({
+    storage,
     options: {
       lastMessages: 20,
       semanticRecall: false,

@@ -21,16 +21,32 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
     } = await supabase.auth.getSession();
 
     if (!session || error) {
+      console.error("[PowerSync] fetchCredentials failed:", error?.message ?? "no session");
       throw new Error(`Could not fetch Supabase credentials: ${error?.message}`);
     }
 
-    return {
-      endpoint: import.meta.env.VITE_POWERSYNC_URL,
+    const endpoint = import.meta.env.VITE_POWERSYNC_URL;
+    if (!endpoint) {
+      console.error("[PowerSync] VITE_POWERSYNC_URL is not set");
+      throw new Error("VITE_POWERSYNC_URL environment variable is not configured");
+    }
+
+    const credentials = {
+      endpoint,
       token: session.access_token ?? "",
       expiresAt: session.expires_at
         ? new Date(session.expires_at * 1000)
         : undefined,
     };
+
+    console.debug(
+      "[PowerSync] fetchCredentials OK:",
+      `endpoint=${endpoint}`,
+      `tokenLength=${credentials.token.length}`,
+      `expiresAt=${credentials.expiresAt?.toISOString() ?? "none"}`,
+    );
+
+    return credentials;
   }
 
   async uploadData(database: AbstractPowerSyncDatabase) {

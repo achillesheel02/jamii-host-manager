@@ -5,3 +5,8 @@ dist
 .env.*.local
 *.log
 .DS_Store
+.mastra/
+mastra/public/*.db
+mastra/public/*.db-shm
+mastra/public/*.db-wal
+tsconfig.tsbuildinfo

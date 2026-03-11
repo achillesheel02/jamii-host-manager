@@ -46,7 +46,7 @@ export function AddProperty() {
             onChange={(e) => setName(e.target.value)}
             required
             placeholder="e.g. Seventh Haven at Leo Residences"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
         </div>
         <div>
@@ -59,7 +59,7 @@ export function AddProperty() {
             onChange={(e) => setAddress(e.target.value)}
             required
             placeholder="e.g. C10-2, Leo Residences, Lavington, Nairobi"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
         </div>
         <div>
@@ -71,14 +71,14 @@ export function AddProperty() {
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Brief description for guests..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
         </div>
         <div className="flex gap-3 pt-2">
           <button
             type="submit"
             disabled={saving}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="bg-amber-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50"
           >
             {saving ? "Adding..." : "Add Property"}
           </button>

@@ -21,6 +21,8 @@ const bookings = new TableV2(
     total_price: column.real,
     notes: column.text,
     created_at: column.text,
+    // Hive Memory
+    guest_return_count: column.integer,
   },
   { indexes: { property: ["property_id"] } },
 );
@@ -59,6 +61,9 @@ const pricing_history = new TableV2(
     actual_price: column.real,
     source: column.text,
     competitor_avg: column.real,
+    // Hive Memory
+    accuracy_score: column.real,
+    created_at: column.text,
   },
   { indexes: { property_date: ["property_id", "date"] } },
 );
@@ -71,8 +76,13 @@ const agent_memories = new TableV2(
     content: column.text,
     confidence: column.real,
     created_at: column.text,
+    // Hive Memory intelligence
+    decay_lambda: column.real,
+    last_validated: column.text,
+    times_validated: column.integer,
+    source: column.text,
   },
-  { indexes: { guest: ["guest_email"] } },
+  { indexes: { guest: ["guest_email"], confidence: ["confidence"] } },
 );
 
 export const AppSchema = new Schema({

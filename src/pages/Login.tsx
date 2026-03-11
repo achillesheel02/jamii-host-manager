@@ -47,7 +47,7 @@ export function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-sm w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-600">Jamii</h1>
+          <h1 className="text-3xl font-bold text-amber-600">Jamii</h1>
           <p className="text-gray-500 mt-2">
             Offline-first host manager for short-term rentals
           </p>
@@ -66,7 +66,7 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
@@ -80,7 +80,7 @@ export function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
@@ -89,7 +89,7 @@ export function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full bg-amber-500 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50"
           >
             {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
           </button>

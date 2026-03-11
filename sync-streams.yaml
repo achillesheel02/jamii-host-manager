@@ -25,6 +25,33 @@ streams:
   property_pricing:
     query: SELECT * FROM pricing_history WHERE property_id = subscription.parameter('property_id')
 
+  # Auto-subscribed: all bookings for host's properties (powers Hive Dashboard)
+  my_bookings:
+    auto_subscribe: true
+    query: >
+      SELECT * FROM bookings
+      WHERE property_id IN (
+        SELECT id FROM properties WHERE host_id = auth.user_id()
+      )
+
+  # Auto-subscribed: all tasks for host's properties
+  my_tasks:
+    auto_subscribe: true
+    query: >
+      SELECT * FROM tasks
+      WHERE property_id IN (
+        SELECT id FROM properties WHERE host_id = auth.user_id()
+      )
+
+  # Auto-subscribed: all pricing history for host's properties
+  my_pricing:
+    auto_subscribe: true
+    query: >
+      SELECT * FROM pricing_history
+      WHERE property_id IN (
+        SELECT id FROM properties WHERE host_id = auth.user_id()
+      )
+
   # Auto-subscribed: all agent memories for host's properties
   guest_memories:
     auto_subscribe: true

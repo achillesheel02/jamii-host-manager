@@ -41,16 +41,31 @@ export function PropertyDetail() {
   const { data: bookings } = useQuery(
     "SELECT * FROM bookings WHERE property_id = ? ORDER BY check_in DESC",
     [id!],
+    {
+      streams: [
+        { name: "property_bookings", parameters: { property_id: id! } },
+      ],
+    },
   );
 
   const { data: tasks } = useQuery(
     "SELECT * FROM tasks WHERE property_id = ? ORDER BY CASE WHEN status = 'pending' THEN 0 ELSE 1 END, due_date",
     [id!],
+    {
+      streams: [
+        { name: "property_tasks", parameters: { property_id: id! } },
+      ],
+    },
   );
 
   const { data: pricing } = useQuery(
     "SELECT * FROM pricing_history WHERE property_id = ? ORDER BY date DESC LIMIT 7",
     [id!],
+    {
+      streams: [
+        { name: "property_pricing", parameters: { property_id: id! } },
+      ],
+    },
   );
 
   // --- Agent Insights (offline-resilient: reads from local SQLite) ---
@@ -170,7 +185,7 @@ export function PropertyDetail() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link to="/" className="text-sm text-amber-600 hover:underline">
           &larr; Back
         </Link>
 
@@ -180,7 +195,7 @@ export function PropertyDetail() {
               type="text"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="block w-full text-2xl font-bold text-gray-900 border-b-2 border-blue-500 focus:outline-none bg-transparent"
+              className="block w-full text-2xl font-bold text-gray-900 border-b-2 border-amber-500 focus:outline-none bg-transparent"
             />
             <input
               type="text"
@@ -193,7 +208,7 @@ export function PropertyDetail() {
               onChange={(e) => setEditDesc(e.target.value)}
               rows={2}
               placeholder="Description..."
-              className="block w-full text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="block w-full text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -204,13 +219,13 @@ export function PropertyDetail() {
                 value={editAmenities}
                 onChange={(e) => setEditAmenities(e.target.value)}
                 placeholder="WiFi, Kitchen, Pool, Parking..."
-                className="block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="block w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
             <div className="flex gap-2">
               <button
                 onClick={saveProperty}
-                className="bg-blue-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="bg-amber-500 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-amber-600 transition-colors"
               >
                 Save
               </button>
@@ -231,7 +246,7 @@ export function PropertyDetail() {
               </div>
               <button
                 onClick={startEditing}
-                className="text-sm text-gray-400 hover:text-blue-600 transition-colors"
+                className="text-sm text-gray-400 hover:text-amber-600 transition-colors"
                 title="Edit property"
               >
                 Edit
@@ -245,7 +260,7 @@ export function PropertyDetail() {
                 {amenities.map((a) => (
                   <span
                     key={a}
-                    className="inline-block bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full"
+                    className="inline-block bg-amber-50 text-amber-800 text-xs px-2.5 py-1 rounded-full border border-amber-200"
                   >
                     {a}
                   </span>
@@ -259,15 +274,18 @@ export function PropertyDetail() {
       {/* Pricing snapshot */}
       {pricing.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Recent Pricing</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <span className="w-1 h-5 bg-amber-400 rounded-full" />
+            Recent Pricing
+          </h2>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-amber-50">
                 <tr>
-                  <th className="text-left px-4 py-2 text-gray-500 font-medium">Date</th>
-                  <th className="text-right px-4 py-2 text-gray-500 font-medium">Suggested</th>
-                  <th className="text-right px-4 py-2 text-gray-500 font-medium">Actual</th>
-                  <th className="text-right px-4 py-2 text-gray-500 font-medium">Competitor Avg</th>
+                  <th className="text-left px-4 py-2 text-amber-800 font-medium">Date</th>
+                  <th className="text-right px-4 py-2 text-amber-800 font-medium">Suggested</th>
+                  <th className="text-right px-4 py-2 text-amber-800 font-medium">Actual</th>
+                  <th className="text-right px-4 py-2 text-amber-800 font-medium">Competitor Avg</th>
                 </tr>
               </thead>
               <tbody>
@@ -295,16 +313,19 @@ export function PropertyDetail() {
       {hasInsights && (
         <section>
           <div className="flex items-center gap-2 mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">Agent Insights</h2>
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <span className="w-1 h-5 bg-amber-400 rounded-full" />
+              Agent Insights
+            </h2>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
               Available offline
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Latest agent pricing suggestion */}
             {agentPricing.length > 0 && (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <p className="text-xs font-medium text-purple-600 uppercase">Last AI Suggestion</p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-xs font-medium text-amber-600 uppercase">Last AI Suggestion</p>
                 <p className="text-xl font-bold text-gray-900 mt-1">
                   {formatCurrency(agentPricing[0].suggested_price)}
                   <span className="text-sm text-gray-500 font-normal">/night</span>
@@ -320,8 +341,8 @@ export function PropertyDetail() {
 
             {/* Guest memories */}
             {guestMemories.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-xs font-medium text-blue-600 uppercase">Guest Memories</p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-xs font-medium text-yellow-700 uppercase">Guest Memories</p>
                 <ul className="mt-2 space-y-1.5">
                   {guestMemories.slice(0, 3).map((m, i) => (
                     <li key={i} className="text-xs text-gray-700">
@@ -355,10 +376,13 @@ export function PropertyDetail() {
       {/* Bookings */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Bookings</h2>
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <span className="w-1 h-5 bg-amber-400 rounded-full" />
+            Bookings
+          </h2>
           <button
             onClick={() => setShowAddBooking(!showAddBooking)}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-amber-600 hover:text-amber-700"
           >
             {showAddBooking ? "Cancel" : "+ Add Booking"}
           </button>
@@ -375,7 +399,7 @@ export function PropertyDetail() {
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -384,7 +408,7 @@ export function PropertyDetail() {
                   type="email"
                   value={guestEmail}
                   onChange={(e) => setGuestEmail(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -394,7 +418,7 @@ export function PropertyDetail() {
                   value={checkIn}
                   onChange={(e) => setCheckIn(e.target.value)}
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -404,7 +428,7 @@ export function PropertyDetail() {
                   value={checkOut}
                   onChange={(e) => setCheckOut(e.target.value)}
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -413,7 +437,7 @@ export function PropertyDetail() {
                   type="tel"
                   value={guestPhone}
                   onChange={(e) => setGuestPhone(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -422,7 +446,7 @@ export function PropertyDetail() {
                   type="number"
                   value={totalPrice}
                   onChange={(e) => setTotalPrice(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
             </div>
@@ -433,12 +457,12 @@ export function PropertyDetail() {
                 value={bookingNotes}
                 onChange={(e) => setBookingNotes(e.target.value)}
                 placeholder="Any special requests..."
-                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="bg-amber-500 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-amber-600 transition-colors"
             >
               Add Booking
             </button>
@@ -459,10 +483,13 @@ export function PropertyDetail() {
       {/* Tasks */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <span className="w-1 h-5 bg-amber-400 rounded-full" />
+            Tasks
+          </h2>
           <button
             onClick={() => setShowAddTask(!showAddTask)}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-amber-600 hover:text-amber-700"
           >
             {showAddTask ? "Cancel" : "+ Add Task"}
           </button>
@@ -477,7 +504,7 @@ export function PropertyDetail() {
                 <select
                   value={taskType}
                   onChange={(e) => setTaskType(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
                   <option value="cleaning">Cleaning</option>
                   <option value="maintenance">Maintenance</option>
@@ -494,7 +521,7 @@ export function PropertyDetail() {
                   onChange={(e) => setTaskDesc(e.target.value)}
                   required
                   placeholder="What needs to be done?"
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
             </div>
@@ -505,12 +532,12 @@ export function PropertyDetail() {
                   type="date"
                   value={taskDue}
                   onChange={(e) => setTaskDue(e.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="bg-amber-500 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-amber-600 transition-colors"
               >
                 Add Task
               </button>
@@ -533,7 +560,7 @@ export function PropertyDetail() {
                   {t.status === "pending" ? (
                     <button
                       onClick={() => completeTask(t.id)}
-                      className="w-5 h-5 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors flex-shrink-0"
+                      className="w-5 h-5 rounded border-2 border-gray-300 hover:border-amber-500 transition-colors flex-shrink-0"
                       title="Mark complete"
                     />
                   ) : (
@@ -544,7 +571,7 @@ export function PropertyDetail() {
                     </div>
                   )}
                   <div>
-                    <span className="text-xs font-medium text-gray-400 uppercase">
+                    <span className="text-xs font-medium text-amber-600 uppercase">
                       {t.type}
                     </span>
                     <p className={`text-sm ${t.status === "completed" ? "text-gray-400 line-through" : "text-gray-900"}`}>

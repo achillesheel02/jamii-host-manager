@@ -10,3 +10,4 @@ mastra/public/*.db
 mastra/public/*.db-shm
 mastra/public/*.db-wal
 tsconfig.tsbuildinfo
+supabase/.temp/

@@ -58,7 +58,7 @@ export function BookingDetail() {
       <div>
         <Link
           to={`/property/${booking.property_id}`}
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-amber-600 hover:underline"
         >
           &larr; Back to property
         </Link>
@@ -98,7 +98,7 @@ export function BookingDetail() {
                 onClick={() => updateStatus(s.value)}
                 className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
                   booking.status === s.value
-                    ? "bg-blue-600 text-white"
+                    ? "bg-amber-500 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
@@ -133,11 +133,11 @@ export function BookingDetail() {
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           placeholder="Type a message..."
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
         />
         <button
           onClick={sendMessage}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="bg-amber-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors"
         >
           Send
         </button>

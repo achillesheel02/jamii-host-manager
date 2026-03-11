@@ -286,6 +286,9 @@ const AGENT_MEMORIES = [
     memory_type: "preference",
     content: "Prefers extra towels. Likes the city-view side of the apartment.",
     confidence: 0.85,
+    decay_lambda: 0.49, // validated twice → 1.0 * 0.7 * 0.7
+    times_validated: 3,
+    source: "conversation",
   },
   {
     propertyIndex: 0,
@@ -294,6 +297,9 @@ const AGENT_MEMORIES = [
     content:
       "Gave 5-star review after first stay. Mentioned enjoying the rooftop gym.",
     confidence: 0.9,
+    decay_lambda: 0.7, // validated once
+    times_validated: 2,
+    source: "review",
   },
   {
     propertyIndex: 0,
@@ -301,6 +307,9 @@ const AGENT_MEMORIES = [
     memory_type: "interest",
     content: "Asked about monthly rates. Potential long-term booking opportunity.",
     confidence: 0.7,
+    decay_lambda: 1.0, // never validated — decaying
+    times_validated: 1,
+    source: "conversation",
   },
   {
     propertyIndex: 0,
@@ -308,6 +317,9 @@ const AGENT_MEMORIES = [
     memory_type: "requirement",
     content: "Business traveler. Needs reliable WiFi and quiet environment.",
     confidence: 0.8,
+    decay_lambda: 1.0, // first-time guest, not yet validated
+    times_validated: 1,
+    source: "booking_notes",
   },
   {
     propertyIndex: 1,
@@ -315,6 +327,9 @@ const AGENT_MEMORIES = [
     memory_type: "preference",
     content: "Digital nomad. Prefers desk near window. Needs strong WiFi.",
     confidence: 0.75,
+    decay_lambda: 1.0,
+    times_validated: 1,
+    source: "conversation",
   },
   {
     propertyIndex: 2,
@@ -322,6 +337,9 @@ const AGENT_MEMORIES = [
     memory_type: "requirement",
     content: "Corporate traveler. Needs receipts with company details and KRA PIN.",
     confidence: 0.8,
+    decay_lambda: 0.7,
+    times_validated: 2,
+    source: "conversation",
   },
   {
     propertyIndex: 2,
@@ -329,6 +347,9 @@ const AGENT_MEMORIES = [
     memory_type: "preference",
     content: "Family with kids. Requested extra bedding and early check-in for nap time.",
     confidence: 0.85,
+    decay_lambda: 1.0,
+    times_validated: 1,
+    source: "booking_notes",
   },
 ];
 
@@ -354,13 +375,20 @@ function generatePricingHistory(propertyIndex: number): Array<{
     const rate = isWeekend ? Math.round(base * 1.15) : base;
     const compRate = isWeekend ? Math.round(comp * 1.12) : comp;
 
+    // Accuracy: how close was suggested to actual? 1.0 = perfect, lower = worse
+    const actualPrice = d > 3 ? rate + Math.round((Math.random() - 0.4) * rate * 0.1) : null;
+    const accuracyScore = actualPrice != null
+      ? Math.max(0, 1 - Math.abs(rate - actualPrice) / rate)
+      : null;
+
     entries.push({
       propertyIndex,
       date: dateStr,
       suggested_price: rate,
-      actual_price: d > 3 ? rate : null,
+      actual_price: actualPrice,
       source: "algorithm",
       competitor_avg: compRate,
+      accuracy_score: accuracyScore,
     });
   }
   return entries;
@@ -493,13 +521,21 @@ async function seed() {
     console.log(`  Property: ${data.name} (${data.id})`);
   }
 
-  // 2. Insert bookings
+  // 2. Insert bookings (track return guests)
+  const guestVisitCount: Record<string, number> = {};
   const bookingIds: string[] = [];
   for (const booking of BOOKINGS) {
     const { propertyIndex, ...bookingData } = booking;
+    const key = `${booking.guest_email}:${propertyIndex}`;
+    guestVisitCount[key] = (guestVisitCount[key] || 0) + 1;
+    const returnCount = guestVisitCount[key] - 1; // 0 for first visit
     const { data, error } = await supabase
       .from("bookings")
-      .insert({ ...bookingData, property_id: propertyIds[propertyIndex] })
+      .insert({
+        ...bookingData,
+        property_id: propertyIds[propertyIndex],
+        guest_return_count: returnCount,
+      })
       .select()
       .single();
 
@@ -533,12 +569,16 @@ async function seed() {
     console.log(`  Messages: ${msgGroup.messages.length} for ${BOOKINGS[msgGroup.bookingIndex].guest_name}`);
   }
 
-  // 4. Insert agent memories
+  // 4. Insert agent memories (with Hive fields)
   for (const mem of AGENT_MEMORIES) {
     const { propertyIndex, ...memData } = mem;
+    const lastValidated = new Date(
+      Date.now() - Math.round((1 / (memData.decay_lambda || 1)) * 7 * 86400000),
+    ).toISOString();
     await supabase.from("agent_memories").insert({
       property_id: propertyIds[propertyIndex],
       ...memData,
+      last_validated: lastValidated,
     });
   }
   console.log(`  Agent memories: ${AGENT_MEMORIES.length}`);

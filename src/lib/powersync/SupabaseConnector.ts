@@ -15,12 +15,24 @@ const FATAL_RESPONSE_CODES = [
 
 export class SupabaseConnector implements PowerSyncBackendConnector {
   async fetchCredentials() {
+    // Try to get a fresh session. If offline, getSession() still returns the
+    // cached session from localStorage — which may have an expired JWT.
+    // That's OK: PowerSync will fail to connect to its cloud endpoint but
+    // the local SQLite database remains fully usable.
     const {
       data: { session },
       error,
     } = await supabase.auth.getSession();
 
     if (!session || error) {
+      // If offline and we have no cached session at all, throw so PowerSync
+      // knows it can't sync. The local DB still works for reads.
+      if (!navigator.onLine) {
+        console.warn(
+          "[PowerSync] fetchCredentials — offline with no cached session. " +
+          "Local reads still work.",
+        );
+      }
       console.error("[PowerSync] fetchCredentials failed:", error?.message ?? "no session");
       throw new Error(`Could not fetch Supabase credentials: ${error?.message}`);
     }
@@ -44,6 +56,7 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
       `endpoint=${endpoint}`,
       `tokenLength=${credentials.token.length}`,
       `expiresAt=${credentials.expiresAt?.toISOString() ?? "none"}`,
+      `online=${navigator.onLine}`,
     );
 
     return credentials;

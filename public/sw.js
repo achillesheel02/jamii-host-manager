@@ -1,18 +1,25 @@
 /**
- * Jamii Service Worker — Offline App Shell
+ * Jamii Service Worker — Offline App Shell + Asset Caching
  *
- * Strategy: Cache-first for app shell (HTML, JS, CSS, images),
- * network-first for API calls. PowerSync handles data sync separately —
- * this SW only handles the app shell so the UI loads offline.
+ * Strategy:
+ *   Navigation requests  -> serve cached index.html (SPA routing)
+ *   WASM files           -> cache-first (large, content-hashed, immutable)
+ *   JS/CSS/other assets  -> stale-while-revalidate (instant + fresh)
+ *   PowerSync/Supabase   -> pass through (PowerSync handles its own sync)
+ *
+ * The WASM files for PowerSync SQLite are 1-2.5 MB each. After the first
+ * load they're cached here so the app boots instantly offline.
  */
-const CACHE_NAME = "jamii-v1";
+const CACHE_NAME = "jamii-v2";
 
 const APP_SHELL = [
   "/",
   "/index.html",
+  "/manifest.json",
 ];
 
-// Install: pre-cache app shell
+// Install: pre-cache the minimal app shell.
+// Hashed Vite bundles and WASM are cached lazily on first fetch.
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
@@ -20,7 +27,7 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: clean old caches and take control immediately
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -32,14 +39,19 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: cache-first for navigation/assets, network-first for API
+// Helper: cache a response
+function putInCache(request, response) {
+  caches.open(CACHE_NAME).then((cache) => cache.put(request, response));
+}
+
+// Fetch handler
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests
+  // Skip non-GET
   if (event.request.method !== "GET") return;
 
-  // Skip PowerSync and Supabase requests — PowerSync handles its own sync
+  // Skip cross-origin sync requests — PowerSync handles its own sync
   if (
     url.hostname.includes("powersync") ||
     url.hostname.includes("supabase") ||
@@ -48,38 +60,66 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // For navigation requests, serve the cached index.html (SPA routing)
+  // Skip other external origins
+  if (url.origin !== self.location.origin) return;
+
+  // ---- Navigation -> cached index.html (SPA) ----
   if (event.request.mode === "navigate") {
     event.respondWith(
-      caches.match("/index.html").then((cached) =>
-        cached || fetch(event.request).then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", clone));
+      caches.match("/index.html").then((cached) => {
+        if (cached) {
+          // Serve from cache, update in background
+          fetch(event.request)
+            .then((res) => { if (res.ok) putInCache("/index.html", res); })
+            .catch(() => {});
+          return cached;
+        }
+        return fetch(event.request).then((response) => {
+          putInCache("/index.html", response.clone());
           return response;
-        }),
-      ),
+        }).catch(() =>
+          new Response(
+            '<html><body style="font-family:system-ui;text-align:center;padding:4rem">' +
+            '<h1 style="color:#f59e0b">Jamii</h1>' +
+            '<p>You are offline. Please connect to the internet for the first load.</p>' +
+            '</body></html>',
+            { headers: { "Content-Type": "text/html" } },
+          )
+        );
+      }),
     );
     return;
   }
 
-  // For assets: cache-first, then network with cache update
+  // ---- WASM files -> cache-first (immutable, content-hashed) ----
+  if (url.pathname.endsWith(".wasm")) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.ok) putInCache(event.request, response.clone());
+          return response;
+        }).catch(() => new Response("", { status: 503, statusText: "Offline" }));
+      }),
+    );
+    return;
+  }
+
+  // ---- All other same-origin assets -> stale-while-revalidate ----
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        // Only cache same-origin successful responses
-        if (response.ok && url.origin === self.location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        // If offline and not cached, return a basic offline page for navigation
-        if (event.request.mode === "navigate") {
-          return caches.match("/index.html");
-        }
-        return new Response("", { status: 503, statusText: "Offline" });
-      });
+      const networkFetch = fetch(event.request)
+        .then((response) => {
+          if (response.ok) putInCache(event.request, response.clone());
+          return response;
+        })
+        .catch(() => {
+          if (cached) return cached;
+          return new Response("", { status: 503, statusText: "Offline" });
+        });
+
+      // Return cached immediately if available, otherwise wait for network
+      return cached || networkFetch;
     }),
   );
 });

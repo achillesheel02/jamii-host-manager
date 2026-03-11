@@ -10,6 +10,7 @@ interface ChatMessage {
 }
 
 const MASTRA_URL = import.meta.env.VITE_MASTRA_URL || "http://localhost:4111";
+const IS_LOCAL_AGENT = MASTRA_URL.includes("localhost") || MASTRA_URL.includes("127.0.0.1");
 
 const STARTER_PROMPTS = [
   "Price my place this weekend",
@@ -149,12 +150,14 @@ export function BeeChat() {
       ]);
     } catch (err) {
       console.error("Agent error:", err);
+      const offlineMsg = !navigator.onLine
+        ? "You're offline right now. BeeChat needs an internet connection to the AI agent, but all your property data, bookings, and tasks are available offline in the app."
+        : IS_LOCAL_AGENT
+          ? "BeeChat connects to the Mastra AI agent running locally. Run `npx mastra dev` to start it, or set VITE_MASTRA_URL for a deployed agent."
+          : "Could not reach the Hive AI agent. Please try again in a moment.";
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content: "Could not reach the Hive. Make sure `npx mastra dev` is running.",
-        },
+        { role: "assistant", content: offlineMsg },
       ]);
     } finally {
       setLoading(false);

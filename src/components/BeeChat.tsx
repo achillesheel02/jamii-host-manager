@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@powersync/react";
+import { useBeeChatContext } from "@/lib/BeeChatContext";
+import { formatDate, formatCurrency, nightCount } from "@/lib/format";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -11,13 +13,6 @@ interface ChatMessage {
 
 const MASTRA_URL = import.meta.env.VITE_MASTRA_URL || "http://localhost:4111";
 const IS_LOCAL_AGENT = MASTRA_URL.includes("localhost") || MASTRA_URL.includes("127.0.0.1");
-
-const STARTER_PROMPTS = [
-  "Price my place this weekend",
-  "Any repeat guests coming up?",
-  "Draft a welcome message",
-  "Summarise today's check-ins",
-];
 
 /* ------------------------------------------------------------------ */
 /*  Bee SVG — with animated wings                                      */
@@ -73,11 +68,14 @@ function BeeSvg({ size = 56, animated = false }: { size?: number; animated?: boo
 }
 
 /* ------------------------------------------------------------------ */
-/*  BeeChat — floating widget                                          */
+/*  BeeChat — context-aware floating widget                            */
+/*                                                                      */
+/*  Reads from BeeChatContext to know which page/property/booking the    */
+/*  host is viewing. Queries PowerSync local SQLite for relevant data    */
+/*  and injects it as rich context into the AI agent prompt.             */
 /* ------------------------------------------------------------------ */
 export function BeeChat() {
   const [open, setOpen] = useState(false);
-  // visible tracks whether the panel is in the DOM (for exit animation)
   const [visible, setVisible] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -86,39 +84,209 @@ export function BeeChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Page context from the current route
+  const { pageContext } = useBeeChatContext();
+
+  // ── Global queries (always available) ────────────────────────────
   const { data: properties } = useQuery("SELECT id, name FROM properties ORDER BY name");
 
-  // Manage open/close with animation timing
+  // ── Context-aware queries from PowerSync local SQLite ────────────
+  // These only fire when we have the right context, giving the agent
+  // rich local data without needing server-side access to SQLite.
+
+  // Property bookings — when on a property page or if a property is selected
+  const activePropertyId = pageContext.propertyId || selectedProperty || "";
+  const { data: propertyBookings } = useQuery(
+    activePropertyId
+      ? "SELECT id, guest_name, guest_email, check_in, check_out, status, total_price, guest_return_count FROM bookings WHERE property_id = ? ORDER BY check_in DESC LIMIT 10"
+      : "SELECT 1 WHERE 0",
+    activePropertyId ? [activePropertyId] : [],
+  );
+
+  // Guest memories — when on a booking page with a guest email
+  const guestEmail = pageContext.guestEmail || "";
+  const { data: guestMemories } = useQuery(
+    guestEmail
+      ? "SELECT memory_type, content, confidence, times_validated FROM agent_memories WHERE guest_email = ? ORDER BY confidence DESC LIMIT 8"
+      : "SELECT 1 WHERE 0",
+    guestEmail ? [guestEmail] : [],
+  );
+
+  // Recent messages — when on a booking page
+  const bookingId = pageContext.bookingId || "";
+  const { data: recentMessages } = useQuery(
+    bookingId
+      ? "SELECT sender, content, created_at FROM messages WHERE booking_id = ? ORDER BY created_at DESC LIMIT 5"
+      : "SELECT 1 WHERE 0",
+    bookingId ? [bookingId] : [],
+  );
+
+  // Pricing history — when on a property page
+  const { data: pricingData } = useQuery(
+    activePropertyId
+      ? "SELECT date, suggested_price, actual_price, competitor_avg FROM pricing_history WHERE property_id = ? ORDER BY date DESC LIMIT 7"
+      : "SELECT 1 WHERE 0",
+    activePropertyId ? [activePropertyId] : [],
+  );
+
+  // Tasks — when on a property page
+  const { data: propertyTasks } = useQuery(
+    activePropertyId
+      ? "SELECT type, description, status, due_date FROM tasks WHERE property_id = ? AND status != 'completed' ORDER BY due_date LIMIT 5"
+      : "SELECT 1 WHERE 0",
+    activePropertyId ? [activePropertyId] : [],
+  );
+
+  // Dashboard-level stats
+  const { data: dashboardStats } = useQuery(
+    pageContext.page === "dashboard"
+      ? `SELECT
+           (SELECT COUNT(*) FROM bookings WHERE status = 'confirmed' AND check_in >= date('now')) as upcoming,
+           (SELECT COUNT(*) FROM bookings WHERE status = 'checked_in') as checked_in,
+           (SELECT COUNT(*) FROM tasks WHERE status != 'completed') as open_tasks,
+           (SELECT COUNT(*) FROM agent_memories) as memories`
+      : "SELECT 1 WHERE 0",
+  );
+
+  // ── Auto-select property from route context ──────────────────────
+  useEffect(() => {
+    if (pageContext.propertyId && pageContext.propertyId !== selectedProperty) {
+      setSelectedProperty(pageContext.propertyId);
+    }
+  }, [pageContext.propertyId]);
+
+  // ── Build context-aware starter prompts ──────────────────────────
+  const starterPrompts = useMemo(() => {
+    const guest = pageContext.guestName;
+    switch (pageContext.page) {
+      case "booking":
+        return [
+          `Draft a welcome message for ${guest || "this guest"}`,
+          `What do we know about ${guest || "this guest"}?`,
+          "Create a check-in prep task",
+          "Suggest pricing for the next stay",
+        ];
+      case "property":
+        return [
+          "Price this property for the weekend",
+          "Show me upcoming bookings",
+          "Any repeat guests coming up?",
+          "Create a cleaning task for tomorrow",
+        ];
+      default:
+        return [
+          "Price my place this weekend",
+          "Any repeat guests coming up?",
+          "Draft a welcome message",
+          "Summarise today's check-ins",
+        ];
+    }
+  }, [pageContext.page, pageContext.guestName]);
+
+  // ── Build rich context from local PowerSync data ─────────────────
+  const buildLocalContext = (): string => {
+    const parts: string[] = [];
+
+    // Page context header
+    if (pageContext.page === "booking" && pageContext.guestName) {
+      parts.push(`[CURRENT VIEW: Booking for ${pageContext.guestName}]`);
+      if (pageContext.checkIn && pageContext.checkOut) {
+        const nights = nightCount(pageContext.checkIn, pageContext.checkOut);
+        parts.push(`Check-in: ${formatDate(pageContext.checkIn)} | Check-out: ${formatDate(pageContext.checkOut)} (${nights} nights)`);
+      }
+    } else if (pageContext.page === "property" && pageContext.propertyName) {
+      parts.push(`[CURRENT VIEW: Property — ${pageContext.propertyName}]`);
+    } else if (pageContext.page === "dashboard") {
+      parts.push("[CURRENT VIEW: Hive Dashboard — overview of all properties]");
+    }
+
+    // Property context
+    if (activePropertyId) {
+      const prop = properties.find((p) => p.id === activePropertyId);
+      if (prop) {
+        parts.push(`Property: ${prop.name} (ID: ${activePropertyId})`);
+      }
+    }
+
+    // Dashboard stats from local SQLite
+    if (dashboardStats.length > 0 && pageContext.page === "dashboard") {
+      const s = dashboardStats[0];
+      parts.push(`\n--- LIVE DATA (from local offline database) ---`);
+      parts.push(`Upcoming bookings: ${s.upcoming} | Currently checked in: ${s.checked_in}`);
+      parts.push(`Open tasks: ${s.open_tasks} | Guest memories stored: ${s.memories}`);
+    }
+
+    // Bookings from local SQLite
+    if (propertyBookings.length > 0) {
+      parts.push(`\n--- RECENT BOOKINGS (from local offline database) ---`);
+      for (const b of propertyBookings) {
+        const returnTag = b.guest_return_count > 0 ? ` [RETURN GUEST x${b.guest_return_count}]` : "";
+        parts.push(`- ${b.guest_name} | ${formatDate(b.check_in)} to ${formatDate(b.check_out)} | ${b.status} | ${formatCurrency(b.total_price)}${returnTag}`);
+      }
+    }
+
+    // Guest memories from local SQLite
+    if (guestMemories.length > 0) {
+      parts.push(`\n--- GUEST INTELLIGENCE (Hive Memory, from local offline database) ---`);
+      for (const m of guestMemories) {
+        const strength = m.confidence >= 0.8 ? "strong" : m.confidence >= 0.5 ? "moderate" : "weak";
+        const validated = m.times_validated > 1 ? ` (validated ${m.times_validated}x)` : "";
+        parts.push(`- [${m.memory_type}] ${m.content} — confidence: ${strength}${validated}`);
+      }
+    }
+
+    // Recent messages from local SQLite
+    if (recentMessages.length > 0) {
+      parts.push(`\n--- RECENT MESSAGES (from local offline database) ---`);
+      for (const msg of [...recentMessages].reverse()) {
+        parts.push(`- [${msg.sender}] ${msg.content}`);
+      }
+    }
+
+    // Pricing from local SQLite
+    if (pricingData.length > 0) {
+      parts.push(`\n--- PRICING HISTORY (from local offline database) ---`);
+      for (const p of pricingData) {
+        parts.push(`- ${formatDate(p.date)}: suggested ${formatCurrency(p.suggested_price)} | actual ${formatCurrency(p.actual_price)} | competitors avg ${formatCurrency(p.competitor_avg)}`);
+      }
+    }
+
+    // Open tasks from local SQLite
+    if (propertyTasks.length > 0) {
+      parts.push(`\n--- OPEN TASKS (from local offline database) ---`);
+      for (const t of propertyTasks) {
+        parts.push(`- [${t.type}] ${t.description} | due: ${formatDate(t.due_date)} | ${t.status}`);
+      }
+    }
+
+    return parts.length > 0 ? parts.join("\n") + "\n\n" : "";
+  };
+
+  // ── Open/close animation ─────────────────────────────────────────
   useEffect(() => {
     if (open) {
       setVisible(true);
-      // Focus input after panel animates in
       setTimeout(() => inputRef.current?.focus(), 350);
     } else {
-      // Let exit animation play, then unmount
       const timer = setTimeout(() => setVisible(false), 280);
       return () => clearTimeout(timer);
     }
   }, [open]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, loading]);
 
+  // ── Send message with rich local context ─────────────────────────
   const sendMessage = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || loading) return;
 
-    let contextPrefix = "";
-    if (selectedProperty) {
-      const prop = properties.find((p) => p.id === selectedProperty);
-      if (prop) {
-        contextPrefix = `[Property: ${prop.name} (ID: ${selectedProperty})]\n\n`;
-      }
-    }
+    // Build context prefix from local PowerSync data
+    const contextPrefix = buildLocalContext();
 
     const userMessage: ChatMessage = { role: "user", content };
     const allMessages = [...messages, userMessage];
@@ -179,7 +347,13 @@ export function BeeChat() {
               <BeeSvg size={28} />
               <div>
                 <p className="text-sm font-bold text-amber-900">Jamii Hive Mind</p>
-                <p className="text-[10px] text-amber-800/70">AI-powered host intelligence</p>
+                <p className="text-[10px] text-amber-800/70">
+                  {pageContext.page === "booking" && pageContext.guestName
+                    ? `Guest: ${pageContext.guestName}`
+                    : pageContext.page === "property" && pageContext.propertyName
+                      ? pageContext.propertyName
+                      : "AI-powered host intelligence"}
+                </p>
               </div>
             </div>
             <button
@@ -219,10 +393,14 @@ export function BeeChat() {
               <div className="flex flex-col items-center justify-center h-full py-8 space-y-4">
                 <BeeSvg size={48} />
                 <p className="text-xs text-gray-400 text-center max-w-[200px]">
-                  Ask me about pricing, guests, bookings, or tasks
+                  {pageContext.page === "booking"
+                    ? `Ask me about ${pageContext.guestName || "this guest"}`
+                    : pageContext.page === "property"
+                      ? `Ask me about ${pageContext.propertyName || "this property"}`
+                      : "Ask me about pricing, guests, bookings, or tasks"}
                 </p>
                 <div className="grid grid-cols-1 gap-1.5 w-full px-2">
-                  {STARTER_PROMPTS.map((prompt) => (
+                  {starterPrompts.map((prompt) => (
                     <button
                       key={prompt}
                       onClick={() => sendMessage(prompt)}

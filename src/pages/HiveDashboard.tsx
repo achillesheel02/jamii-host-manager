@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useStatus } from "@powersync/react";
 import { formatDate, formatDateShort, formatCurrency } from "@/lib/format";
+import { useBeeChatContext } from "@/lib/BeeChatContext";
 
 /**
  * Hive Dashboard — Intelligence, not inventory.
@@ -11,6 +13,8 @@ import { formatDate, formatDateShort, formatCurrency } from "@/lib/format";
  * works even when the internet doesn't."
  */
 export function HiveDashboard() {
+  const { setPageContext } = useBeeChatContext();
+  useEffect(() => { setPageContext({ page: "dashboard" }); }, [setPageContext]);
   const syncStatus = useStatus();
   const hasSynced = syncStatus.hasSynced;
 

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, usePowerSync } from "@powersync/react";
 import { MessageBubble } from "@/components/MessageBubble";
 import { formatDate, formatCurrency, nightCount } from "@/lib/format";
+import { useBeeChatContext } from "@/lib/BeeChatContext";
 
 const STATUSES = [
   { value: "confirmed", label: "Confirmed" },
@@ -14,6 +15,7 @@ const STATUSES = [
 export function BookingDetail() {
   const { id } = useParams<{ id: string }>();
   const db = usePowerSync();
+  const { setPageContext } = useBeeChatContext();
   const [newMessage, setNewMessage] = useState("");
 
   const { data: bookings } = useQuery(
@@ -31,6 +33,21 @@ export function BookingDetail() {
       ],
     },
   );
+
+  // Set BeeChat context so the agent knows which booking/guest we're viewing
+  useEffect(() => {
+    if (booking) {
+      setPageContext({
+        page: "booking",
+        propertyId: booking.property_id,
+        bookingId: id,
+        guestName: booking.guest_name,
+        guestEmail: booking.guest_email,
+        checkIn: booking.check_in,
+        checkOut: booking.check_out,
+      });
+    }
+  }, [id, booking?.guest_name, setPageContext]);
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;

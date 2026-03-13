@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, usePowerSync } from "@powersync/react";
 import { BookingCard } from "@/components/BookingCard";
 import { formatDate, formatCurrency } from "@/lib/format";
+import { useBeeChatContext } from "@/lib/BeeChatContext";
 
 export function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const db = usePowerSync();
+  const { setPageContext } = useBeeChatContext();
 
   // --- Booking form state ---
   const [showAddBooking, setShowAddBooking] = useState(false);
@@ -37,6 +39,17 @@ export function PropertyDetail() {
     [id!],
   );
   const property = properties[0];
+
+  // Set BeeChat context so the agent knows which property we're viewing
+  useEffect(() => {
+    if (property) {
+      setPageContext({
+        page: "property",
+        propertyId: id,
+        propertyName: property.name,
+      });
+    }
+  }, [id, property?.name, setPageContext]);
 
   const { data: bookings } = useQuery(
     "SELECT * FROM bookings WHERE property_id = ? ORDER BY check_in DESC",

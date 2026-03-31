@@ -10,10 +10,9 @@
  * The WASM files for PowerSync SQLite are 1-2.5 MB each. After the first
  * load they're cached here so the app boots instantly offline.
  */
-const CACHE_NAME = "jamii-v2";
+const CACHE_NAME = "jamii-v3";
 
 const APP_SHELL = [
-  "/",
   "/index.html",
   "/manifest.json",
 ];
@@ -44,6 +43,18 @@ function putInCache(request, response) {
   caches.open(CACHE_NAME).then((cache) => cache.put(request, response));
 }
 
+// Strip redirect flag — Safari refuses to serve redirected responses from SW
+function cleanResponse(response) {
+  if (response.redirected) {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  }
+  return response;
+}
+
 // Fetch handler
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
@@ -69,14 +80,15 @@ self.addEventListener("fetch", (event) => {
       caches.match("/index.html").then((cached) => {
         if (cached) {
           // Serve from cache, update in background
-          fetch(event.request)
-            .then((res) => { if (res.ok) putInCache("/index.html", res); })
+          fetch("/index.html")
+            .then((res) => { if (res.ok) putInCache("/index.html", cleanResponse(res)); })
             .catch(() => {});
           return cached;
         }
-        return fetch(event.request).then((response) => {
-          putInCache("/index.html", response.clone());
-          return response;
+        return fetch("/index.html").then((response) => {
+          const clean = cleanResponse(response);
+          putInCache("/index.html", clean.clone());
+          return clean;
         }).catch(() =>
           new Response(
             '<html><body style="font-family:system-ui;text-align:center;padding:4rem">' +
